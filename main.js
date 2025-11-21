@@ -62,12 +62,12 @@ const addProfileShortcut = (profileId, titleInput) => {
   const button = document.createElement("button");
   button.type = "button";
   button.className =
-    "w-full text-left px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50";
+    "w-full text-left px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors";
+  button.setAttribute("data-profile-shortcut", profileId);
   button.textContent = `Job Profil ${profileId}`;
+  
   button.addEventListener("click", () => {
-    document
-      .querySelector(`.job-profile-card[data-profile-id="${profileId}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    showProfile(profileId);
   });
 
   if (titleInput) {
@@ -78,6 +78,33 @@ const addProfileShortcut = (profileId, titleInput) => {
   }
 
   profileShortcuts.appendChild(button);
+};
+
+const showProfile = (profileId) => {
+  // Verstecke alle Profile
+  document.querySelectorAll(".job-profile-card").forEach((card) => {
+    card.classList.add("hidden");
+  });
+  
+  // Zeige das ausgewählte Profil
+  const selectedCard = document.querySelector(
+    `.job-profile-card[data-profile-id="${profileId}"]`
+  );
+  if (selectedCard) {
+    selectedCard.classList.remove("hidden");
+  }
+  
+  // Aktualisiere die aktiven Shortcuts
+  document.querySelectorAll("[data-profile-shortcut]").forEach((btn) => {
+    const btnProfileId = btn.getAttribute("data-profile-shortcut");
+    if (btnProfileId === String(profileId)) {
+      btn.classList.add("bg-indigo-50", "border-indigo-300", "text-indigo-700");
+      btn.classList.remove("text-slate-600");
+    } else {
+      btn.classList.remove("bg-indigo-50", "border-indigo-300", "text-indigo-700");
+      btn.classList.add("text-slate-600");
+    }
+  });
 };
 
 const addJobProfile = () => {
@@ -121,11 +148,42 @@ const addJobProfile = () => {
   const appendedCard = document.querySelector(
     `.job-profile-card[data-profile-id="${profileCounter}"]`
   );
+  
+  // Verstecke alle Profile außer dem ersten
+  if (profileCounter > 1) {
+    appendedCard?.classList.add("hidden");
+  }
+  
   const titleInput = appendedCard?.querySelector('[data-field="jobTitle"]');
   if (titleInput instanceof HTMLInputElement) {
     addProfileShortcut(profileCounter, titleInput);
   } else {
     addProfileShortcut(profileCounter, null);
+  }
+  
+  // Füge Save-Button Event Listener hinzu
+  const saveButton = appendedCard?.querySelector("[data-save-profile]");
+  if (saveButton) {
+    saveButton.addEventListener("click", () => {
+      saveProfile(profileCounter, appendedCard);
+    });
+    
+    // Prüfe, ob dieses Profil bereits gespeichert wurde
+    const savedProfiles = JSON.parse(localStorage.getItem("savedProfiles") || "{}");
+    if (savedProfiles[profileCounter]) {
+      saveButton.classList.remove("bg-indigo-600", "hover:bg-indigo-500");
+      saveButton.classList.add("bg-emerald-600", "hover:bg-emerald-500");
+      saveButton.setAttribute("data-saved", "true");
+      
+      // Füge Checkmark hinzu
+      if (!saveButton.querySelector(".checkmark")) {
+        const checkmark = document.createElement("span");
+        checkmark.className = "checkmark";
+        checkmark.innerHTML = "✓";
+        checkmark.style.marginRight = "0.5rem";
+        saveButton.insertBefore(checkmark, saveButton.firstChild);
+      }
+    }
   }
 };
 
@@ -133,7 +191,59 @@ if (addJobProfileBtn) {
   addJobProfileBtn.addEventListener("click", addJobProfile);
 }
 
+const saveProfile = (profileId, cardElement) => {
+  const form = cardElement.querySelector("form");
+  if (!form) return;
+  
+  const formData = new FormData(form);
+  const profileData = {};
+  
+  // Sammle alle Formularfelder
+  form.querySelectorAll("[data-field]").forEach((field) => {
+    const fieldName = field.getAttribute("data-field");
+    if (fieldName) {
+      profileData[fieldName] = field.value;
+    }
+  });
+  
+  // Sammle Rollenbeschreibungen
+  const roleDescriptions = [];
+  form.querySelectorAll("[data-description-field]").forEach((textarea) => {
+    if (textarea.value.trim()) {
+      roleDescriptions.push(textarea.value.trim());
+    }
+  });
+  profileData.roleDescriptions = roleDescriptions;
+  
+  // Speichere im localStorage
+  const savedProfiles = JSON.parse(localStorage.getItem("savedProfiles") || "{}");
+  savedProfiles[profileId] = profileData;
+  localStorage.setItem("savedProfiles", JSON.stringify(savedProfiles));
+  
+  // Aktualisiere Button-Status
+  const saveButton = cardElement.querySelector("[data-save-profile]");
+  if (saveButton) {
+    saveButton.classList.remove("bg-indigo-600", "hover:bg-indigo-500");
+    saveButton.classList.add("bg-emerald-600", "hover:bg-emerald-500");
+    saveButton.setAttribute("data-saved", "true");
+    
+    // Füge Checkmark hinzu, falls noch nicht vorhanden
+    if (!saveButton.querySelector(".checkmark")) {
+      const checkmark = document.createElement("span");
+      checkmark.className = "checkmark";
+      checkmark.innerHTML = "✓";
+      checkmark.style.marginRight = "0.5rem";
+      saveButton.insertBefore(checkmark, saveButton.firstChild);
+    }
+  }
+};
+
 addJobProfile();
+
+// Zeige das erste Profil beim Laden
+if (profileCounter > 0) {
+  showProfile(1);
+}
 
 const employeeForm = document.getElementById("employee-form");
 const resultBox = document.getElementById("result");
