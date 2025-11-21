@@ -519,6 +519,124 @@ if (profileCounter > 0) {
   showProfile(1);
 }
 
+// Datei-Upload-Logik
+const fileUploadInput = document.getElementById("file-upload");
+const uploadStatus = document.getElementById("upload-status");
+
+if (fileUploadInput) {
+  fileUploadInput.addEventListener("change", async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Zeige Upload-Status
+    uploadStatus.classList.remove("hidden");
+    uploadStatus.textContent = "Datei wird hochgeladen und analysiert...";
+    uploadStatus.className = "text-sm text-blue-600";
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    try {
+      const response = await fetch("http://localhost:5000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Fehler beim Hochladen");
+      }
+      
+      // Erstelle Job Profile aus der Antwort
+      if (data.profiles && Array.isArray(data.profiles)) {
+        uploadStatus.textContent = `${data.profiles.length} Job Profile gefunden. Werden erstellt...`;
+        
+        const firstProfileId = profileCounter + 1;
+        
+        for (let i = 0; i < data.profiles.length; i++) {
+          const profileData = data.profiles[i];
+          
+          // Erstelle neues Profil
+          addJobProfile();
+          
+          // Finde das zuletzt erstellte Profil
+          const lastProfile = document.querySelector(
+            `.job-profile-card[data-profile-id="${profileCounter}"]`
+          );
+          
+          if (lastProfile) {
+            // Verstecke alle Profile außer dem ersten neuen
+            if (i > 0) {
+              lastProfile.classList.add("hidden");
+            }
+            
+            // Fülle die Felder aus
+            const form = lastProfile.querySelector("form");
+            if (form) {
+              // Fülle alle Felder
+              Object.keys(profileData).forEach((key) => {
+                const field = form.querySelector(`[data-field="${key}"]`);
+                if (field) {
+                  field.value = profileData[key] || "";
+                  
+                  // Für Select-Felder
+                  if (field.tagName === "SELECT") {
+                    field.value = profileData[key] || "";
+                  }
+                  
+                  // Trigger input event für Change-Tracking
+                  field.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+              });
+              
+              // Aktualisiere den Shortcut-Namen
+              const titleInput = form.querySelector('[data-field="jobTitle"]');
+              if (titleInput && titleInput.value) {
+                const shortcutButton = document.querySelector(
+                  `[data-profile-shortcut="${profileCounter}"]`
+                );
+                if (shortcutButton) {
+                  shortcutButton.textContent = titleInput.value;
+                }
+              }
+            }
+          }
+        }
+        
+        uploadStatus.textContent = `✓ ${data.profiles.length} Job Profile erfolgreich erstellt!`;
+        uploadStatus.className = "text-sm text-emerald-600";
+        
+        // Zeige das erste neue Profil
+        if (data.profiles.length > 0) {
+          showProfile(firstProfileId);
+        }
+      } else {
+        throw new Error("Keine Profile in der Antwort gefunden");
+      }
+      
+      // Reset file input
+      fileUploadInput.value = "";
+      
+      // Verstecke Status nach 5 Sekunden
+      setTimeout(() => {
+        uploadStatus.classList.add("hidden");
+      }, 5000);
+      
+    } catch (error) {
+      console.error("Upload-Fehler:", error);
+      uploadStatus.textContent = `✗ Fehler: ${error.message}`;
+      uploadStatus.className = "text-sm text-red-600";
+      fileUploadInput.value = "";
+      
+      // Verstecke Status nach 5 Sekunden
+      setTimeout(() => {
+        uploadStatus.classList.add("hidden");
+      }, 5000);
+    }
+  });
+}
+
 // Fragen werden beim Erstellen der Fragebögen generiert
 
 // Mitarbeiterfragebogen-Logik

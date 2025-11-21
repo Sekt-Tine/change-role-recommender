@@ -110,6 +110,21 @@
           >
             <span class="text-lg leading-none">+</span> Job Profil hinzufügen
           </button>
+          <div class="relative">
+            <input
+              type="file"
+              id="file-upload"
+              accept=".xlsx,.xls,.doc,.docx,.pdf,.txt"
+              class="hidden"
+            />
+            <label
+              for="file-upload"
+              class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white py-2 font-semibold hover:bg-emerald-500 transition-colors cursor-pointer"
+            >
+              <span class="text-lg leading-none">📄</span> Dokument hochladen (KI)
+            </label>
+          </div>
+          <div id="upload-status" class="hidden text-sm text-slate-600"></div>
           <div id="profile-shortcuts" class="space-y-2"></div>
         </aside>
 
