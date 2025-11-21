@@ -27,6 +27,11 @@ const switchSection = (targetSelector, trigger) => {
     btn.setAttribute("data-active", String(btn === trigger));
   });
 
+  // Aktualisiere Fragen, wenn zum Fragebogen gewechselt wird
+  if (targetSelector === "#questionnaire-section") {
+    generateQuestionnaireQuestions();
+  }
+
   target.scrollIntoView({ behavior: "smooth", block: "start" });
 };
 
@@ -191,6 +196,234 @@ if (addJobProfileBtn) {
   addJobProfileBtn.addEventListener("click", addJobProfile);
 }
 
+// Funktion zum Extrahieren von Items aus Textfeldern
+const extractItems = (text) => {
+  if (!text || !text.trim()) return [];
+  
+  // Teile nach Komma, Semikolon, Zeilenumbruch oder Bullet Points
+  const items = text
+    .split(/[,;\n\r•\-\*]/)
+    .map(item => item.trim())
+    .filter(item => item.length > 0);
+  
+  return [...new Set(items)]; // Entferne Duplikate
+};
+
+// Funktion zum Sammeln aller Anforderungen aus gespeicherten Profilen
+const collectProfileRequirements = () => {
+  const savedProfiles = JSON.parse(localStorage.getItem("savedProfiles") || "{}");
+  const requirements = {
+    skills: new Set(),
+    qualifications: new Set(),
+    strengths: new Set(),
+    responsibilityDetails: new Set(),
+  };
+  
+  Object.values(savedProfiles).forEach((profile) => {
+    if (profile.skills) {
+      extractItems(profile.skills).forEach(item => requirements.skills.add(item));
+    }
+    if (profile.qualifications) {
+      extractItems(profile.qualifications).forEach(item => requirements.qualifications.add(item));
+    }
+    if (profile.strengths) {
+      extractItems(profile.strengths).forEach(item => requirements.strengths.add(item));
+    }
+    if (profile.responsibilityDetails) {
+      extractItems(profile.responsibilityDetails).forEach(item => requirements.responsibilityDetails.add(item));
+    }
+  });
+  
+  return {
+    skills: Array.from(requirements.skills).sort(),
+    qualifications: Array.from(requirements.qualifications).sort(),
+    strengths: Array.from(requirements.strengths).sort(),
+    responsibilityDetails: Array.from(requirements.responsibilityDetails).sort(),
+  };
+};
+
+// Funktion zum Generieren von Multiple Choice Fragen
+const generateQuestionnaireQuestions = () => {
+  const requirements = collectProfileRequirements();
+  const questionsContainer = document.getElementById("dynamic-questions");
+  if (!questionsContainer) return;
+  
+  // Leere den Container
+  questionsContainer.innerHTML = "";
+  
+  // Qualifikationen als Checkboxen (mehrfach auswählbar)
+  if (requirements.qualifications.length > 0) {
+    const qualSection = document.createElement("div");
+    qualSection.className = "flex flex-col gap-3";
+    
+    const qualLabel = document.createElement("label");
+    qualLabel.className = "text-sm font-medium text-slate-700";
+    qualLabel.textContent = "Qualifikationen / Zertifikate";
+    qualSection.appendChild(qualLabel);
+    
+    const qualHint = document.createElement("p");
+    qualHint.className = "text-xs text-slate-500 mb-2";
+    qualHint.textContent = "Bitte wählen Sie alle zutreffenden Qualifikationen aus:";
+    qualSection.appendChild(qualHint);
+    
+    const checkboxContainer = document.createElement("div");
+    checkboxContainer.className = "space-y-2 border border-slate-200 rounded-xl p-4 bg-slate-50";
+    
+    requirements.qualifications.forEach((qual, index) => {
+      const checkboxWrapper = document.createElement("label");
+      checkboxWrapper.className = "flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded-lg transition-colors";
+      
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "qualifications[]";
+      checkbox.value = qual;
+      checkbox.className = "w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500";
+      
+      const checkboxLabel = document.createElement("span");
+      checkboxLabel.className = "text-sm text-slate-700";
+      checkboxLabel.textContent = qual;
+      
+      checkboxWrapper.appendChild(checkbox);
+      checkboxWrapper.appendChild(checkboxLabel);
+      checkboxContainer.appendChild(checkboxWrapper);
+    });
+    
+    qualSection.appendChild(checkboxContainer);
+    questionsContainer.appendChild(qualSection);
+  }
+  
+  // Fähigkeiten als Checkboxen
+  if (requirements.skills.length > 0) {
+    const skillsSection = document.createElement("div");
+    skillsSection.className = "flex flex-col gap-3";
+    
+    const skillsLabel = document.createElement("label");
+    skillsLabel.className = "text-sm font-medium text-slate-700";
+    skillsLabel.textContent = "Fähigkeiten";
+    skillsSection.appendChild(skillsLabel);
+    
+    const skillsHint = document.createElement("p");
+    skillsHint.className = "text-xs text-slate-500 mb-2";
+    skillsHint.textContent = "Bitte wählen Sie alle zutreffenden Fähigkeiten aus:";
+    skillsSection.appendChild(skillsHint);
+    
+    const checkboxContainer = document.createElement("div");
+    checkboxContainer.className = "space-y-2 border border-slate-200 rounded-xl p-4 bg-slate-50";
+    
+    requirements.skills.forEach((skill) => {
+      const checkboxWrapper = document.createElement("label");
+      checkboxWrapper.className = "flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded-lg transition-colors";
+      
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "skills[]";
+      checkbox.value = skill;
+      checkbox.className = "w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500";
+      
+      const checkboxLabel = document.createElement("span");
+      checkboxLabel.className = "text-sm text-slate-700";
+      checkboxLabel.textContent = skill;
+      
+      checkboxWrapper.appendChild(checkbox);
+      checkboxWrapper.appendChild(checkboxLabel);
+      checkboxContainer.appendChild(checkboxWrapper);
+    });
+    
+    skillsSection.appendChild(checkboxContainer);
+    questionsContainer.appendChild(skillsSection);
+  }
+  
+  // Stärken als Checkboxen
+  if (requirements.strengths.length > 0) {
+    const strengthsSection = document.createElement("div");
+    strengthsSection.className = "flex flex-col gap-3";
+    
+    const strengthsLabel = document.createElement("label");
+    strengthsLabel.className = "text-sm font-medium text-slate-700";
+    strengthsLabel.textContent = "Typische Stärken";
+    strengthsSection.appendChild(strengthsLabel);
+    
+    const strengthsHint = document.createElement("p");
+    strengthsHint.className = "text-xs text-slate-500 mb-2";
+    strengthsHint.textContent = "Bitte wählen Sie alle zutreffenden Stärken aus:";
+    strengthsSection.appendChild(strengthsHint);
+    
+    const checkboxContainer = document.createElement("div");
+    checkboxContainer.className = "space-y-2 border border-slate-200 rounded-xl p-4 bg-slate-50";
+    
+    requirements.strengths.forEach((strength) => {
+      const checkboxWrapper = document.createElement("label");
+      checkboxWrapper.className = "flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded-lg transition-colors";
+      
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "strengths[]";
+      checkbox.value = strength;
+      checkbox.className = "w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500";
+      
+      const checkboxLabel = document.createElement("span");
+      checkboxLabel.className = "text-sm text-slate-700";
+      checkboxLabel.textContent = strength;
+      
+      checkboxWrapper.appendChild(checkbox);
+      checkboxWrapper.appendChild(checkboxLabel);
+      checkboxContainer.appendChild(checkboxWrapper);
+    });
+    
+    strengthsSection.appendChild(checkboxContainer);
+    questionsContainer.appendChild(strengthsSection);
+  }
+  
+  // Verantwortungsbereiche als Checkboxen
+  if (requirements.responsibilityDetails.length > 0) {
+    const respSection = document.createElement("div");
+    respSection.className = "flex flex-col gap-3";
+    
+    const respLabel = document.createElement("label");
+    respLabel.className = "text-sm font-medium text-slate-700";
+    respLabel.textContent = "Verantwortungsbereiche";
+    respSection.appendChild(respLabel);
+    
+    const respHint = document.createElement("p");
+    respHint.className = "text-xs text-slate-500 mb-2";
+    respHint.textContent = "Bitte wählen Sie alle zutreffenden Verantwortungsbereiche aus:";
+    respSection.appendChild(respHint);
+    
+    const checkboxContainer = document.createElement("div");
+    checkboxContainer.className = "space-y-2 border border-slate-200 rounded-xl p-4 bg-slate-50";
+    
+    requirements.responsibilityDetails.forEach((resp) => {
+      const checkboxWrapper = document.createElement("label");
+      checkboxWrapper.className = "flex items-center gap-2 cursor-pointer hover:bg-white p-2 rounded-lg transition-colors";
+      
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.name = "responsibilityDetails[]";
+      checkbox.value = resp;
+      checkbox.className = "w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500";
+      
+      const checkboxLabel = document.createElement("span");
+      checkboxLabel.className = "text-sm text-slate-700";
+      checkboxLabel.textContent = resp;
+      
+      checkboxWrapper.appendChild(checkbox);
+      checkboxWrapper.appendChild(checkboxLabel);
+      checkboxContainer.appendChild(checkboxWrapper);
+    });
+    
+    respSection.appendChild(checkboxContainer);
+    questionsContainer.appendChild(respSection);
+  }
+  
+  // Hinweis, falls keine Fragen generiert werden konnten
+  if (questionsContainer.children.length === 0) {
+    const noQuestionsMsg = document.createElement("p");
+    noQuestionsMsg.className = "text-sm text-slate-500 italic";
+    noQuestionsMsg.textContent = "Bitte speichern Sie zuerst mindestens ein Job Profil, um Fragen zu generieren.";
+    questionsContainer.appendChild(noQuestionsMsg);
+  }
+};
+
 const saveProfile = (profileId, cardElement) => {
   const form = cardElement.querySelector("form");
   if (!form) return;
@@ -236,6 +469,9 @@ const saveProfile = (profileId, cardElement) => {
       saveButton.insertBefore(checkmark, saveButton.firstChild);
     }
   }
+  
+  // Aktualisiere den Fragebogen mit neuen Fragen
+  generateQuestionnaireQuestions();
 };
 
 addJobProfile();
@@ -244,6 +480,9 @@ addJobProfile();
 if (profileCounter > 0) {
   showProfile(1);
 }
+
+// Generiere Fragen beim Laden der Seite
+generateQuestionnaireQuestions();
 
 const employeeForm = document.getElementById("employee-form");
 const resultBox = document.getElementById("result");
@@ -259,6 +498,12 @@ employeeForm.addEventListener("submit", (event) => {
 
   answers.systemsThinking = Number(answers.systemsThinking);
   answers.motivation = Number(answers.motivation);
+  
+  // Sammle Checkbox-Werte (Arrays)
+  answers.qualifications = formData.getAll("qualifications[]");
+  answers.skills = formData.getAll("skills[]");
+  answers.strengths = formData.getAll("strengths[]");
+  answers.responsibilityDetails = formData.getAll("responsibilityDetails[]");
 
   const recommendation = recommendRole(answers);
 
