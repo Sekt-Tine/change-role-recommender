@@ -38,9 +38,26 @@ const switchSection = (targetSelector, trigger) => {
     btn.setAttribute("data-active", String(btn === trigger));
   });
 
-  // Aktualisiere Fragen, wenn zum Fragebogen gewechselt wird
-  if (targetSelector === "#questionnaire-section") {
-    generateQuestionnaireQuestions();
+  // Sidebar-Logik
+  const jobProfilesSidebar = document.getElementById("job-profiles-sidebar");
+  const employeeSidebar = document.getElementById("employee-sidebar");
+  
+  if (targetSelector === "#job-profiles-section") {
+    if (jobProfilesSidebar) jobProfilesSidebar.classList.remove("hidden");
+    if (employeeSidebar) employeeSidebar.classList.add("hidden");
+  } else if (targetSelector === "#questionnaire-section") {
+    if (jobProfilesSidebar) jobProfilesSidebar.classList.add("hidden");
+    if (employeeSidebar) employeeSidebar.classList.remove("hidden");
+    // Aktualisiere Fragen für alle bestehenden Fragebögen
+    document.querySelectorAll(".employee-form-card").forEach((card) => {
+      const employeeId = card.getAttribute("data-employee-id");
+      if (employeeId) {
+        generateQuestionsForEmployee(employeeId);
+      }
+    });
+  } else {
+    if (jobProfilesSidebar) jobProfilesSidebar.classList.add("hidden");
+    if (employeeSidebar) employeeSidebar.classList.add("hidden");
   }
 
   // Aktualisiere Gesamtauswertung, wenn zum Overview gewechselt wird
@@ -486,8 +503,13 @@ const saveProfile = (profileId, cardElement) => {
     }
   }
   
-  // Aktualisiere den Fragebogen mit neuen Fragen
-  generateQuestionnaireQuestions();
+  // Aktualisiere Fragen für alle bestehenden Fragebögen
+  document.querySelectorAll(".employee-form-card").forEach((card) => {
+    const employeeId = card.getAttribute("data-employee-id");
+    if (employeeId) {
+      generateQuestionsForEmployee(employeeId);
+    }
+  });
 };
 
 addJobProfile();
@@ -497,19 +519,240 @@ if (profileCounter > 0) {
   showProfile(1);
 }
 
-// Generiere Fragen beim Laden der Seite
-generateQuestionnaireQuestions();
+// Fragen werden beim Erstellen der Fragebögen generiert
 
-const employeeForm = document.getElementById("employee-form");
-const resultBox = document.getElementById("result");
-const roleName = document.getElementById("role-name");
-const probabilityEl = document.getElementById("probability");
-const rationaleEl = document.getElementById("rationale");
-const risksEl = document.getElementById("risks");
+// Mitarbeiterfragebogen-Logik
+const employeeFormsContainer = document.getElementById("employee-forms-container");
+const employeeFormTemplate = document.getElementById("employee-form-template");
+const addEmployeeBtn = document.getElementById("add-employee");
+const employeeShortcuts = document.getElementById("employee-shortcuts");
+let employeeCounter = 0;
 
-employeeForm.addEventListener("submit", (event) => {
-  event.preventDefault();
-  const formData = new FormData(employeeForm);
+const addEmployeeShortcut = (employeeId, nameInput) => {
+  if (!employeeShortcuts) return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className =
+    "w-full text-left px-3 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors";
+  button.setAttribute("data-employee-shortcut", employeeId);
+  button.textContent = `Mitarbeiter ${employeeId}`;
+  
+  button.addEventListener("click", () => {
+    showEmployee(employeeId);
+  });
+
+  if (nameInput) {
+    nameInput.addEventListener("input", () => {
+      const label = nameInput.value.trim() || `Mitarbeiter ${employeeId}`;
+      button.textContent = label;
+    });
+  }
+
+  employeeShortcuts.appendChild(button);
+};
+
+const showEmployee = (employeeId) => {
+  // Verstecke alle Fragebögen
+  document.querySelectorAll(".employee-form-card").forEach((card) => {
+    card.classList.add("hidden");
+  });
+  
+  // Zeige den ausgewählten Fragebogen
+  const selectedCard = document.querySelector(
+    `.employee-form-card[data-employee-id="${employeeId}"]`
+  );
+  if (selectedCard) {
+    selectedCard.classList.remove("hidden");
+  }
+  
+  // Aktualisiere die aktiven Shortcuts
+  document.querySelectorAll("[data-employee-shortcut]").forEach((btn) => {
+    const btnEmployeeId = btn.getAttribute("data-employee-shortcut");
+    if (btnEmployeeId === String(employeeId)) {
+      btn.classList.add("bg-emerald-50", "border-emerald-300", "text-emerald-700");
+      btn.classList.remove("text-slate-600");
+    } else {
+      btn.classList.remove("bg-emerald-50", "border-emerald-300", "text-emerald-700");
+      btn.classList.add("text-slate-600");
+    }
+  });
+};
+
+const addEmployee = () => {
+  if (!employeeFormsContainer || !employeeFormTemplate) return;
+  employeeCounter += 1;
+
+  const fragment = employeeFormTemplate.content.cloneNode(true);
+  const card = fragment.querySelector(".employee-form-card");
+
+  if (!card) return;
+  card.dataset.employeeId = String(employeeCounter);
+
+  const form = card.querySelector("form");
+  
+  // Füge alle Felder hinzu
+  const nameField = document.createElement("label");
+  nameField.className = "flex flex-col gap-2";
+  nameField.innerHTML = `
+    <span class="text-sm font-medium text-slate-700">Name</span>
+    <input
+      type="text"
+      class="text-field"
+      name="name"
+      placeholder="z. B. Max Mustermann"
+      required
+      data-employee-field
+    />
+  `;
+  form.insertBefore(nameField, form.querySelector("[data-save-employee]"));
+
+  const ageField = document.createElement("label");
+  ageField.className = "flex flex-col gap-2";
+  ageField.innerHTML = `
+    <span class="text-sm font-medium text-slate-700">Alter</span>
+    <input
+      type="number"
+      class="text-field"
+      name="age"
+      min="18"
+      max="70"
+      placeholder="z. B. 35"
+      required
+      data-employee-field
+    />
+  `;
+  form.insertBefore(ageField, form.querySelector("[data-save-employee]"));
+
+  const yearsField = document.createElement("div");
+  yearsField.className = "flex flex-col gap-2";
+  yearsField.innerHTML = `
+    <label class="text-sm font-medium text-slate-700">
+      Betriebszugehörigkeit (in Jahren)
+    </label>
+    <div class="flex items-center gap-3">
+      <input
+        type="range"
+        name="yearsOfService"
+        min="0"
+        max="50"
+        value="5"
+        class="w-full accent-emerald-600"
+        data-employee-field
+      />
+      <output class="range-output text-sm text-slate-600">5</output>
+      <span class="text-xs text-slate-500">Jahre</span>
+    </div>
+  `;
+  form.insertBefore(yearsField, form.querySelector("[data-save-employee]"));
+  initializeRangeFields();
+
+  const positionField = document.createElement("label");
+  positionField.className = "flex flex-col gap-2";
+  positionField.innerHTML = `
+    <span class="text-sm font-medium text-slate-700">Bisherige Position</span>
+    <input
+      type="text"
+      class="text-field"
+      name="currentPosition"
+      placeholder="z. B. Projektmanager"
+      required
+      data-employee-field
+    />
+  `;
+  form.insertBefore(positionField, form.querySelector("[data-save-employee]"));
+
+  const workStyleField = document.createElement("label");
+  workStyleField.className = "flex flex-col gap-2";
+  workStyleField.innerHTML = `
+    <span class="text-sm font-medium text-slate-700">Bevorzugter Arbeitsstil</span>
+    <select class="select-field" name="workStyle" data-employee-field>
+      <option value="agil">Agil</option>
+      <option value="prozessorientiert">Prozessorientiert</option>
+      <option value="hybrid" selected>Hybrid</option>
+    </select>
+  `;
+  form.insertBefore(workStyleField, form.querySelector("[data-save-employee]"));
+
+  const dynamicQuestionsDiv = document.createElement("div");
+  dynamicQuestionsDiv.className = "space-y-5 border-t border-slate-200 pt-5 mt-5";
+  dynamicQuestionsDiv.setAttribute("data-dynamic-questions", employeeCounter);
+  form.insertBefore(dynamicQuestionsDiv, form.querySelector("[data-save-employee]"));
+
+  const commentField = document.createElement("label");
+  commentField.className = "flex flex-col gap-2";
+  commentField.innerHTML = `
+    <span class="text-sm font-medium text-slate-700">Optional: Hinweise zu Lernzielen oder Risiken</span>
+    <textarea
+      class="text-field"
+      name="comment"
+      rows="3"
+      placeholder="z. B. Bedarf an regulatorischer Erfahrung, Wunsch nach Coaching"
+      data-employee-field
+    ></textarea>
+  `;
+  form.insertBefore(commentField, form.querySelector("[data-save-employee]"));
+
+  employeeFormsContainer.appendChild(fragment);
+
+  const appendedCard = document.querySelector(
+    `.employee-form-card[data-employee-id="${employeeCounter}"]`
+  );
+  
+  // Verstecke alle Fragebögen außer dem ersten
+  if (employeeCounter > 1) {
+    appendedCard?.classList.add("hidden");
+  }
+  
+  const nameInput = appendedCard?.querySelector('input[name="name"]');
+  if (nameInput instanceof HTMLInputElement) {
+    addEmployeeShortcut(employeeCounter, nameInput);
+  } else {
+    addEmployeeShortcut(employeeCounter, null);
+  }
+  
+  // Füge Save-Button Event Listener hinzu
+  const saveButton = appendedCard?.querySelector("[data-save-employee]");
+  if (saveButton) {
+    saveButton.addEventListener("click", () => {
+      saveEmployee(employeeCounter, appendedCard);
+    });
+  }
+  
+  // Füge Change-Tracking hinzu
+  appendedCard?.querySelectorAll("[data-employee-field]").forEach((field) => {
+    field.addEventListener("input", () => {
+      resetSaveButton(employeeCounter, appendedCard);
+    });
+    field.addEventListener("change", () => {
+      resetSaveButton(employeeCounter, appendedCard);
+    });
+  });
+  
+  // Generiere Fragen für diesen Fragebogen
+  generateQuestionsForEmployee(employeeCounter);
+};
+
+const resetSaveButton = (employeeId, cardElement) => {
+  const saveButton = cardElement.querySelector("[data-save-employee]");
+  if (saveButton && saveButton.getAttribute("data-saved") === "true") {
+    // Setze Button zurück auf blau (indigo)
+    saveButton.classList.remove("bg-emerald-600", "hover:bg-emerald-500");
+    saveButton.classList.add("bg-indigo-600", "hover:bg-indigo-500");
+    saveButton.setAttribute("data-saved", "false");
+    
+    // Entferne Checkmark
+    const checkmark = saveButton.querySelector(".checkmark");
+    if (checkmark) {
+      checkmark.remove();
+    }
+  }
+};
+
+const saveEmployee = (employeeId, cardElement) => {
+  const form = cardElement.querySelector("form");
+  if (!form) return;
+  
+  const formData = new FormData(form);
   const answers = Object.fromEntries(formData.entries());
 
   answers.age = Number(answers.age);
@@ -520,23 +763,159 @@ employeeForm.addEventListener("submit", (event) => {
   answers.skills = formData.getAll("skills[]");
   answers.strengths = formData.getAll("strengths[]");
   answers.responsibilityDetails = formData.getAll("responsibilityDetails[]");
-
-  // Speichere Mitarbeiterantworten
-  const employeeAnswers = JSON.parse(localStorage.getItem("employeeAnswers") || "[]");
-  answers.id = Date.now().toString(); // Eindeutige ID
+  
+  // Speichere mit eindeutiger ID
+  answers.id = `employee-${employeeId}`;
   answers.timestamp = new Date().toISOString();
-  employeeAnswers.push(answers);
+
+  // Speichere im localStorage
+  const employeeAnswers = JSON.parse(localStorage.getItem("employeeAnswers") || "[]");
+  const existingIndex = employeeAnswers.findIndex(e => e.id === answers.id);
+  if (existingIndex >= 0) {
+    employeeAnswers[existingIndex] = answers;
+  } else {
+    employeeAnswers.push(answers);
+  }
   localStorage.setItem("employeeAnswers", JSON.stringify(employeeAnswers));
+  
+  // Aktualisiere Button-Status
+  const saveButton = cardElement.querySelector("[data-save-employee]");
+  if (saveButton) {
+    saveButton.classList.remove("bg-emerald-600", "hover:bg-emerald-500");
+    saveButton.classList.add("bg-emerald-600", "hover:bg-emerald-500");
+    saveButton.setAttribute("data-saved", "true");
+    
+    // Füge Checkmark hinzu, falls noch nicht vorhanden
+    if (!saveButton.querySelector(".checkmark")) {
+      const checkmark = document.createElement("span");
+      checkmark.className = "checkmark";
+      checkmark.innerHTML = "✓";
+      checkmark.style.marginRight = "0.5rem";
+      saveButton.insertBefore(checkmark, saveButton.firstChild);
+    }
+  }
+};
 
-  const recommendation = recommendRole(answers);
+const generateQuestionsForEmployee = (employeeId) => {
+  const card = document.querySelector(`.employee-form-card[data-employee-id="${employeeId}"]`);
+  if (!card) return;
+  
+  const questionsContainer = card.querySelector("[data-dynamic-questions]");
+  if (!questionsContainer) return;
+  
+  const requirements = collectProfileRequirements();
+  questionsContainer.innerHTML = "";
+  
+  // Qualifikationen
+  if (requirements.qualifications.length > 0) {
+    const qualSection = document.createElement("div");
+    qualSection.className = "flex flex-col gap-3";
+    qualSection.innerHTML = `
+      <label class="text-sm font-medium text-slate-700">Qualifikationen / Zertifikate</label>
+      <p class="text-xs text-slate-500 mb-2">Bitte wählen Sie alle zutreffenden Qualifikationen aus:</p>
+      <div class="space-y-2 border border-slate-200 rounded-xl p-4 bg-white"></div>
+    `;
+    const checkboxContainer = qualSection.querySelector("div");
+    requirements.qualifications.forEach((qual) => {
+      const checkboxWrapper = document.createElement("label");
+      checkboxWrapper.className = "flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors";
+      checkboxWrapper.innerHTML = `
+        <input type="checkbox" name="qualifications[]" value="${qual}" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" data-employee-field />
+        <span class="text-sm text-slate-700">${qual}</span>
+      `;
+      checkboxContainer.appendChild(checkboxWrapper);
+    });
+    questionsContainer.appendChild(qualSection);
+  }
+  
+  // Fähigkeiten
+  if (requirements.skills.length > 0) {
+    const skillsSection = document.createElement("div");
+    skillsSection.className = "flex flex-col gap-3";
+    skillsSection.innerHTML = `
+      <label class="text-sm font-medium text-slate-700">Fähigkeiten</label>
+      <p class="text-xs text-slate-500 mb-2">Bitte wählen Sie alle zutreffenden Fähigkeiten aus:</p>
+      <div class="space-y-2 border border-slate-200 rounded-xl p-4 bg-white"></div>
+    `;
+    const checkboxContainer = skillsSection.querySelector("div");
+    requirements.skills.forEach((skill) => {
+      const checkboxWrapper = document.createElement("label");
+      checkboxWrapper.className = "flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors";
+      checkboxWrapper.innerHTML = `
+        <input type="checkbox" name="skills[]" value="${skill}" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" data-employee-field />
+        <span class="text-sm text-slate-700">${skill}</span>
+      `;
+      checkboxContainer.appendChild(checkboxWrapper);
+    });
+    questionsContainer.appendChild(skillsSection);
+  }
+  
+  // Stärken
+  if (requirements.strengths.length > 0) {
+    const strengthsSection = document.createElement("div");
+    strengthsSection.className = "flex flex-col gap-3";
+    strengthsSection.innerHTML = `
+      <label class="text-sm font-medium text-slate-700">Typische Stärken</label>
+      <p class="text-xs text-slate-500 mb-2">Bitte wählen Sie alle zutreffenden Stärken aus:</p>
+      <div class="space-y-2 border border-slate-200 rounded-xl p-4 bg-white"></div>
+    `;
+    const checkboxContainer = strengthsSection.querySelector("div");
+    requirements.strengths.forEach((strength) => {
+      const checkboxWrapper = document.createElement("label");
+      checkboxWrapper.className = "flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors";
+      checkboxWrapper.innerHTML = `
+        <input type="checkbox" name="strengths[]" value="${strength}" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" data-employee-field />
+        <span class="text-sm text-slate-700">${strength}</span>
+      `;
+      checkboxContainer.appendChild(checkboxWrapper);
+    });
+    questionsContainer.appendChild(strengthsSection);
+  }
+  
+  // Verantwortungsbereiche
+  if (requirements.responsibilityDetails.length > 0) {
+    const respSection = document.createElement("div");
+    respSection.className = "flex flex-col gap-3";
+    respSection.innerHTML = `
+      <label class="text-sm font-medium text-slate-700">Verantwortungsbereiche</label>
+      <p class="text-xs text-slate-500 mb-2">Bitte wählen Sie alle zutreffenden Verantwortungsbereiche aus:</p>
+      <div class="space-y-2 border border-slate-200 rounded-xl p-4 bg-white"></div>
+    `;
+    const checkboxContainer = respSection.querySelector("div");
+    requirements.responsibilityDetails.forEach((resp) => {
+      const checkboxWrapper = document.createElement("label");
+      checkboxWrapper.className = "flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-2 rounded-lg transition-colors";
+      checkboxWrapper.innerHTML = `
+        <input type="checkbox" name="responsibilityDetails[]" value="${resp}" class="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500" data-employee-field />
+        <span class="text-sm text-slate-700">${resp}</span>
+      `;
+      checkboxContainer.appendChild(checkboxWrapper);
+    });
+    questionsContainer.appendChild(respSection);
+  }
+  
+  // Füge Change-Tracking für Checkboxen hinzu
+  card.querySelectorAll("[data-employee-field]").forEach((field) => {
+    if (!field.hasAttribute("data-change-tracked")) {
+      field.setAttribute("data-change-tracked", "true");
+      field.addEventListener("change", () => {
+        resetSaveButton(employeeId, card);
+      });
+    }
+  });
+};
 
-  roleName.textContent = `Empfohlene Rolle: ${recommendation.role}`;
-  probabilityEl.textContent = `Wahrscheinlichkeit: ${recommendation.probability}%`;
-  rationaleEl.textContent = recommendation.rationale;
-  risksEl.textContent = recommendation.risks;
+if (addEmployeeBtn) {
+  addEmployeeBtn.addEventListener("click", addEmployee);
+}
 
-  resultBox.classList.remove("hidden");
-});
+// Erstelle ersten Mitarbeiterfragebogen
+addEmployee();
+
+// Zeige den ersten Fragebogen beim Laden
+if (employeeCounter > 0) {
+  showEmployee(1);
+}
 
 function recommendRole(answers) {
   const savedProfiles = JSON.parse(localStorage.getItem("savedProfiles") || "{}");
