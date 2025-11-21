@@ -1,12 +1,23 @@
-const rangeFields = document.querySelectorAll('input[type="range"]');
-rangeFields.forEach((input) => {
-  const output = input.parentElement.querySelector("output");
-  const update = () => {
-    output.textContent = input.value;
-  };
-  input.addEventListener("input", update);
-  update();
-});
+// Initialisiere Range-Felder
+const initializeRangeFields = () => {
+  document.querySelectorAll('input[type="range"]').forEach((input) => {
+    // Prüfe, ob bereits ein Event Listener vorhanden ist
+    if (input.hasAttribute("data-range-initialized")) return;
+    
+    const output = input.parentElement.querySelector("output");
+    if (output) {
+      const update = () => {
+        output.textContent = input.value;
+      };
+      input.addEventListener("input", update);
+      input.setAttribute("data-range-initialized", "true");
+      update();
+    }
+  });
+};
+
+// Initialisiere beim Laden
+initializeRangeFields();
 
 const sectionButtons = document.querySelectorAll("[data-section-toggle]");
 const viewSections = document.querySelectorAll("[data-view-section]");
@@ -30,6 +41,11 @@ const switchSection = (targetSelector, trigger) => {
   // Aktualisiere Fragen, wenn zum Fragebogen gewechselt wird
   if (targetSelector === "#questionnaire-section") {
     generateQuestionnaireQuestions();
+  }
+
+  // Aktualisiere Gesamtauswertung, wenn zum Overview gewechselt wird
+  if (targetSelector === "#overview-section") {
+    generateOverview();
   }
 
   target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -496,14 +512,21 @@ employeeForm.addEventListener("submit", (event) => {
   const formData = new FormData(employeeForm);
   const answers = Object.fromEntries(formData.entries());
 
-  answers.systemsThinking = Number(answers.systemsThinking);
-  answers.motivation = Number(answers.motivation);
+  answers.age = Number(answers.age);
+  answers.yearsOfService = Number(answers.yearsOfService);
   
   // Sammle Checkbox-Werte (Arrays)
   answers.qualifications = formData.getAll("qualifications[]");
   answers.skills = formData.getAll("skills[]");
   answers.strengths = formData.getAll("strengths[]");
   answers.responsibilityDetails = formData.getAll("responsibilityDetails[]");
+
+  // Speichere Mitarbeiterantworten
+  const employeeAnswers = JSON.parse(localStorage.getItem("employeeAnswers") || "[]");
+  answers.id = Date.now().toString(); // Eindeutige ID
+  answers.timestamp = new Date().toISOString();
+  employeeAnswers.push(answers);
+  localStorage.setItem("employeeAnswers", JSON.stringify(employeeAnswers));
 
   const recommendation = recommendRole(answers);
 
@@ -516,48 +539,287 @@ employeeForm.addEventListener("submit", (event) => {
 });
 
 function recommendRole(answers) {
-  const { motivation, changeReadiness, systemsThinking, workStyle } = answers;
-
-  if (motivation >= 4 && changeReadiness === "hoch" && workStyle === "agil") {
+  const savedProfiles = JSON.parse(localStorage.getItem("savedProfiles") || "{}");
+  
+  if (Object.keys(savedProfiles).length === 0) {
     return {
-      role: "Change Coach",
-      probability: 78,
-      rationale:
-        "Hohe Motivation, agile Präferenz und ausgeprägte Change-Bereitschaft passen zu einer coachenden Rolle.",
-      risks:
-        "Bitte Erfahrung im Umgang mit Widerständen und Auslastung prüfen; fehlende Branchentiefe könnte Coaching-Wirkung begrenzen.",
+      role: "Keine Profile gefunden",
+      probability: 0,
+      rationale: "Bitte erstellen und speichern Sie zuerst Job Profile, um Empfehlungen zu erhalten.",
+      risks: "Keine Risikobewertung möglich, da keine Rollenprofile vorhanden sind.",
     };
   }
 
-  if (systemsThinking >= 4 && workStyle === "hybrid") {
+  // Bewerte jedes Profil basierend auf den Antworten
+  const profileScores = [];
+  
+  Object.entries(savedProfiles).forEach(([profileId, profile]) => {
+    let score = 0;
+    let maxScore = 0;
+    const matches = [];
+    const missing = [];
+    
+    // Bewerte Qualifikationen
+    if (profile.qualifications) {
+      const profileQuals = extractItems(profile.qualifications);
+      maxScore += profileQuals.length;
+      if (answers.qualifications && answers.qualifications.length > 0) {
+        const matchedQuals = answers.qualifications.filter(q => profileQuals.includes(q));
+        score += matchedQuals.length;
+        if (matchedQuals.length > 0) {
+          matches.push(`${matchedQuals.length} Qualifikation(en) passen`);
+        }
+        const missingQuals = profileQuals.filter(q => !answers.qualifications.includes(q));
+        if (missingQuals.length > 0) {
+          missing.push(`Fehlende Qualifikationen: ${missingQuals.slice(0, 3).join(", ")}`);
+        }
+      } else {
+        missing.push("Keine Qualifikationen angegeben");
+      }
+    }
+    
+    // Bewerte Fähigkeiten
+    if (profile.skills) {
+      const profileSkills = extractItems(profile.skills);
+      maxScore += profileSkills.length;
+      if (answers.skills && answers.skills.length > 0) {
+        const matchedSkills = answers.skills.filter(s => profileSkills.includes(s));
+        score += matchedSkills.length;
+        if (matchedSkills.length > 0) {
+          matches.push(`${matchedSkills.length} Fähigkeit(en) passen`);
+        }
+        const missingSkills = profileSkills.filter(s => !answers.skills.includes(s));
+        if (missingSkills.length > 0) {
+          missing.push(`Fehlende Fähigkeiten: ${missingSkills.slice(0, 3).join(", ")}`);
+        }
+      } else {
+        missing.push("Keine Fähigkeiten angegeben");
+      }
+    }
+    
+    // Bewerte Stärken
+    if (profile.strengths) {
+      const profileStrengths = extractItems(profile.strengths);
+      maxScore += profileStrengths.length;
+      if (answers.strengths && answers.strengths.length > 0) {
+        const matchedStrengths = answers.strengths.filter(s => profileStrengths.includes(s));
+        score += matchedStrengths.length;
+        if (matchedStrengths.length > 0) {
+          matches.push(`${matchedStrengths.length} Stärke(n) passen`);
+        }
+      }
+    }
+    
+    // Bewerte Verantwortungsbereiche
+    if (profile.responsibilityDetails) {
+      const profileResp = extractItems(profile.responsibilityDetails);
+      maxScore += profileResp.length;
+      if (answers.responsibilityDetails && answers.responsibilityDetails.length > 0) {
+        const matchedResp = answers.responsibilityDetails.filter(r => profileResp.includes(r));
+        score += matchedResp.length;
+        if (matchedResp.length > 0) {
+          matches.push(`${matchedResp.length} Verantwortungsbereich(e) passen`);
+        }
+      }
+    }
+    
+    // Berechne Prozentsatz
+    const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+    
+    profileScores.push({
+      profileId,
+      profile,
+      score,
+      maxScore,
+      percentage,
+      matches,
+      missing: missing.slice(0, 3), // Begrenze auf 3 fehlende Items
+    });
+  });
+  
+  // Sortiere nach Prozentsatz (höchste zuerst)
+  profileScores.sort((a, b) => b.percentage - a.percentage);
+  
+  const bestMatch = profileScores[0];
+  
+  if (!bestMatch || bestMatch.percentage === 0) {
     return {
-      role: "Stream Lead Support",
-      probability: 66,
-      rationale:
-        "Starkes systemisches Denken und hybride Arbeitsweise eignen sich für koordinierende Aufgaben im Stream Lead Umfeld.",
-      risks:
-        "Unklare Führungserfahrung und Stakeholder-Komplexität können zusätzliche Begleitung erfordern; Lernziele beachten.",
+      role: "Keine passende Rolle gefunden",
+      probability: 0,
+      rationale: "Die eingegebenen Anforderungen passen zu keinem der definierten Rollenprofile.",
+      risks: "Bitte überprüfen Sie die Anforderungen oder erstellen Sie neue Rollenprofile.",
     };
   }
-
-  if (motivation <= 2) {
-    return {
-      role: "Transformation Analyst",
-      probability: 55,
-      rationale:
-        "Geringere Veränderungsmotivation deutet auf analytische und strukturierende Rollen mit geringerer Exposition hin.",
-      risks:
-        "Widerstände gegenüber schnellen Iterationen möglich; Coaching zur Motivationssteigerung einplanen.",
-    };
-  }
-
+  
+  const roleTitle = bestMatch.profile.jobTitle || `Job Profil ${bestMatch.profileId}`;
+  const rationale = bestMatch.matches.length > 0
+    ? `Passende Aspekte: ${bestMatch.matches.join("; ")}.`
+    : "Grundlegende Übereinstimmung mit dem Profil.";
+  
+  const risks = bestMatch.missing.length > 0
+    ? `Zu beachten: ${bestMatch.missing.join("; ")}.`
+    : "Alle Hauptanforderungen erfüllt.";
+  
   return {
-    role: "PMO / Delivery Support",
-    probability: 60,
-    rationale:
-      "Ausgeglichene Werte sprechen für eine unterstützende Rolle mit Prozess- und Reporting-Fokus.",
-    risks:
-      "Ohne Angaben zu Erfahrung oder Belastbarkeit bleibt das Risiko von Überforderung unklar; bitte nachreichen.",
+    role: roleTitle,
+    probability: bestMatch.percentage,
+    rationale: rationale,
+    risks: risks,
   };
+}
+
+// Funktion zur Berechnung des Match-Prozentsatzes für einen Mitarbeiter und ein Profil
+function calculateMatchPercentage(employeeAnswers, profile) {
+  let score = 0;
+  let maxScore = 0;
+  
+  // Bewerte Qualifikationen
+  if (profile.qualifications) {
+    const profileQuals = extractItems(profile.qualifications);
+    maxScore += profileQuals.length;
+    if (employeeAnswers.qualifications && employeeAnswers.qualifications.length > 0) {
+      const matchedQuals = employeeAnswers.qualifications.filter(q => profileQuals.includes(q));
+      score += matchedQuals.length;
+    }
+  }
+  
+  // Bewerte Fähigkeiten
+  if (profile.skills) {
+    const profileSkills = extractItems(profile.skills);
+    maxScore += profileSkills.length;
+    if (employeeAnswers.skills && employeeAnswers.skills.length > 0) {
+      const matchedSkills = employeeAnswers.skills.filter(s => profileSkills.includes(s));
+      score += matchedSkills.length;
+    }
+  }
+  
+  // Bewerte Stärken
+  if (profile.strengths) {
+    const profileStrengths = extractItems(profile.strengths);
+    maxScore += profileStrengths.length;
+    if (employeeAnswers.strengths && employeeAnswers.strengths.length > 0) {
+      const matchedStrengths = employeeAnswers.strengths.filter(s => profileStrengths.includes(s));
+      score += matchedStrengths.length;
+    }
+  }
+  
+  // Bewerte Verantwortungsbereiche
+  if (profile.responsibilityDetails) {
+    const profileResp = extractItems(profile.responsibilityDetails);
+    maxScore += profileResp.length;
+    if (employeeAnswers.responsibilityDetails && employeeAnswers.responsibilityDetails.length > 0) {
+      const matchedResp = employeeAnswers.responsibilityDetails.filter(r => profileResp.includes(r));
+      score += matchedResp.length;
+    }
+  }
+  
+  // Berechne Prozentsatz
+  return maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
+}
+
+// Funktion zur Generierung der Gesamtauswertung
+function generateOverview() {
+  const overviewContainer = document.getElementById("overview-container");
+  if (!overviewContainer) return;
+  
+  const savedProfiles = JSON.parse(localStorage.getItem("savedProfiles") || "{}");
+  const employeeAnswers = JSON.parse(localStorage.getItem("employeeAnswers") || "[]");
+  
+  if (Object.keys(savedProfiles).length === 0) {
+    overviewContainer.innerHTML = `
+      <div class="text-center py-8 text-slate-500">
+        <p>Keine Job Profile vorhanden. Bitte erstellen Sie zuerst Rollenprofile.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  if (employeeAnswers.length === 0) {
+    overviewContainer.innerHTML = `
+      <div class="text-center py-8 text-slate-500">
+        <p>Noch keine Mitarbeiterantworten vorhanden. Bitte füllen Sie zuerst den Fragebogen aus.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  overviewContainer.innerHTML = "";
+  
+  // Für jedes Profil die Top 3 Kandidaten finden
+  Object.entries(savedProfiles).forEach(([profileId, profile]) => {
+    const profileTitle = profile.jobTitle || `Job Profil ${profileId}`;
+    
+    // Berechne Match-Prozentsatz für jeden Mitarbeiter
+    const candidateScores = employeeAnswers.map(employee => ({
+      employee,
+      percentage: calculateMatchPercentage(employee, profile),
+    }));
+    
+    // Sortiere nach Prozentsatz (höchste zuerst) und nimm Top 3
+    candidateScores.sort((a, b) => b.percentage - a.percentage);
+    const top3 = candidateScores.slice(0, 3);
+    
+    // Erstelle Karte für dieses Profil
+    const profileCard = document.createElement("div");
+    profileCard.className = "bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4";
+    
+    const profileHeader = document.createElement("div");
+    profileHeader.className = "border-b border-slate-200 pb-3";
+    profileHeader.innerHTML = `
+      <h3 class="text-lg font-semibold text-slate-900">${profileTitle}</h3>
+      ${profile.function ? `<p class="text-sm text-slate-600">${profile.function}</p>` : ""}
+    `;
+    profileCard.appendChild(profileHeader);
+    
+    if (top3.length === 0 || top3[0].percentage === 0) {
+      const noCandidates = document.createElement("p");
+      noCandidates.className = "text-sm text-slate-500 italic py-4";
+      noCandidates.textContent = "Keine passenden Kandidaten gefunden.";
+      profileCard.appendChild(noCandidates);
+    } else {
+      const candidatesList = document.createElement("div");
+      candidatesList.className = "space-y-3 pt-2";
+      
+      top3.forEach((candidate, index) => {
+        const candidateItem = document.createElement("div");
+        candidateItem.className = "flex items-center justify-between bg-white border border-slate-200 rounded-lg p-4";
+        
+        const candidateInfo = document.createElement("div");
+        candidateInfo.className = "flex items-center gap-3";
+        
+        const rankBadge = document.createElement("div");
+        rankBadge.className = `w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${
+          index === 0 ? "bg-emerald-100 text-emerald-700" :
+          index === 1 ? "bg-blue-100 text-blue-700" :
+          "bg-slate-100 text-slate-700"
+        }`;
+        rankBadge.textContent = index + 1;
+        candidateInfo.appendChild(rankBadge);
+        
+        const candidateName = document.createElement("div");
+        candidateName.innerHTML = `
+          <p class="font-medium text-slate-900">${candidate.employee.name || "Unbekannt"}</p>
+          ${candidate.employee.currentPosition ? `<p class="text-xs text-slate-500">${candidate.employee.currentPosition}</p>` : ""}
+        `;
+        candidateInfo.appendChild(candidateName);
+        
+        const percentageBadge = document.createElement("div");
+        percentageBadge.className = `px-4 py-2 rounded-lg font-semibold ${
+          candidate.percentage >= 70 ? "bg-emerald-100 text-emerald-700" :
+          candidate.percentage >= 50 ? "bg-blue-100 text-blue-700" :
+          "bg-amber-100 text-amber-700"
+        }`;
+        percentageBadge.textContent = `${candidate.percentage}%`;
+        
+        candidateItem.appendChild(candidateInfo);
+        candidateItem.appendChild(percentageBadge);
+        candidatesList.appendChild(candidateItem);
+      });
+      
+      profileCard.appendChild(candidatesList);
+    }
+    
+    overviewContainer.appendChild(profileCard);
+  });
 }
 

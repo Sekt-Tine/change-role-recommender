@@ -73,15 +73,23 @@
             >
               Job Profile
             </button>
+            <button
+              type="button"
+              class="nav-link-btn"
+              data-section-toggle
+              data-target="#questionnaire-section"
+            >
+              Mitarbeitenden-Fragebogen
+            </button>
+            <button
+              type="button"
+              class="nav-link-btn"
+              data-section-toggle
+              data-target="#overview-section"
+            >
+              Gesamtauswertung
+            </button>
           </div>
-          <button
-            type="button"
-            class="nav-link-btn justify-end"
-            data-section-toggle
-            data-target="#questionnaire-section"
-          >
-            Mitarbeitenden-Fragebogen
-          </button>
         </div>
       </header>
 
@@ -129,49 +137,57 @@
               </div>
             </div>
             <form id="employee-form" class="space-y-5">
-              <div class="flex flex-col gap-2">
-                <label class="text-sm font-medium text-slate-700">
-                  Systemisches Denken
-                  <span class="text-xs text-slate-500">(1 = gering, 5 = hoch)</span>
-                </label>
-                <div class="flex items-center gap-3">
-                  <input
-                    type="range"
-                    name="systemsThinking"
-                    min="1"
-                    max="5"
-                    value="3"
-                    class="w-full accent-emerald-600"
-                  />
-                  <output class="range-output text-sm text-slate-600">3</output>
-                </div>
-              </div>
+              <label class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-slate-700">Name</span>
+                <input
+                  type="text"
+                  class="text-field"
+                  name="name"
+                  placeholder="z. B. Max Mustermann"
+                  required
+                />
+              </label>
+
+              <label class="flex flex-col gap-2">
+                <span class="text-sm font-medium text-slate-700">Alter</span>
+                <input
+                  type="number"
+                  class="text-field"
+                  name="age"
+                  min="18"
+                  max="70"
+                  placeholder="z. B. 35"
+                  required
+                />
+              </label>
 
               <div class="flex flex-col gap-2">
                 <label class="text-sm font-medium text-slate-700">
-                  Motivation für Transformationsaufgaben
-                  <span class="text-xs text-slate-500">(1 = gering, 5 = hoch)</span>
+                  Betriebszugehörigkeit (in Jahren)
                 </label>
                 <div class="flex items-center gap-3">
                   <input
                     type="range"
-                    name="motivation"
-                    min="1"
-                    max="5"
-                    value="4"
+                    name="yearsOfService"
+                    min="0"
+                    max="50"
+                    value="5"
                     class="w-full accent-emerald-600"
                   />
-                  <output class="range-output text-sm text-slate-600">4</output>
+                  <output class="range-output text-sm text-slate-600">5</output>
+                  <span class="text-xs text-slate-500">Jahre</span>
                 </div>
               </div>
 
               <label class="flex flex-col gap-2">
-                <span class="text-sm font-medium text-slate-700">Change-Bereitschaft</span>
-                <select class="select-field" name="changeReadiness">
-                  <option value="niedrig">Niedrig</option>
-                  <option value="mittel">Mittel</option>
-                  <option value="hoch" selected>Hoch</option>
-                </select>
+                <span class="text-sm font-medium text-slate-700">Bisherige Position</span>
+                <input
+                  type="text"
+                  class="text-field"
+                  name="currentPosition"
+                  placeholder="z. B. Projektmanager"
+                  required
+                />
               </label>
 
               <label class="flex flex-col gap-2">
@@ -219,6 +235,23 @@
               <p class="text-sm text-emerald-800" id="probability"></p>
               <p class="text-sm text-emerald-800" id="rationale"></p>
               <p class="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg p-3" id="risks"></p>
+            </div>
+          </section>
+
+          <section id="overview-section" class="bg-white rounded-2xl shadow-sm p-6 space-y-6 hidden" data-view-section>
+            <div class="flex items-center gap-3">
+              <div class="h-10 w-10 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-semibold">
+                3
+              </div>
+              <div>
+                <h2 class="text-xl font-semibold">Gesamtauswertung</h2>
+                <p class="text-sm text-slate-600">
+                  Übersicht aller Job Profile mit den Top 3 Kandidaten pro Rolle.
+                </p>
+              </div>
+            </div>
+            <div id="overview-container" class="space-y-6">
+              <!-- Dynamisch generierte Auswertung wird hier eingefügt -->
             </div>
           </section>
         </main>
